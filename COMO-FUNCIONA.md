@@ -206,12 +206,21 @@ chat_id ∈ `admins`). Assim, num grupo, o admin continua admin e os demais fica
 > `resolve(channel, raw_user)` (versão simples) permanece para terminal/DM e testes.
 
 ### 4.4 Parsing do harness
-A mensagem do harness pode conter a tag `<channel …>`. Helpers:
-- `parse_prompt(prompt) -> (channel, raw_user)`: sem tag → `("terminal","")`.
-  Telegram prioriza `chat_id`, senão `user`.
+A mensagem do harness contém a tag `<channel …>`. **Formato real do plugin Telegram:**
+```
+<channel source="plugin:telegram:telegram" chat_id="7403271687" message_id="25"
+         user="Nydollar21" user_id="7403271687" ts="...">texto</channel>
+```
+Atributos-chave: `source` (o plugin usa `plugin:telegram:telegram` — normalizamos
+para `telegram`), `chat_id` (id do CHAT: em DM = id do usuário; em grupo = id do
+grupo, começa com `-`), `user` (username), `user_id` (**id numérico do REMETENTE**,
+usado para decidir papel — confiável em DM e em grupo). Helpers:
+- `parse_channel(prompt) -> {channel, chat_id, user, user_id}`.
+- `resolve_prompt(prompt) -> dict` (ver §4.3) — usa `user_id` para papel.
 - `strip_tags(text) -> str`: remove a tag para a captura só ver o texto humano.
-- `parse_attachments(prompt) -> list[str]`: extrai caminhos locais **existentes**
-  dos atributos `image_path`, `attachment_path`, `document_path`, `file_path`.
+- `parse_attachments(prompt) -> list[str]`: caminhos locais **existentes** de
+  `image_path`, `attachment_path`, `document_path`, `file_path`.
+- `parse_prompt` / `resolve` (versões simples) permanecem para compat/testes.
 
 ### 4.5 Estado por sessão (evita conflito terminal × Telegram)
 - `set_active(info, session_id)` / `get_active(session_id)`.
@@ -279,9 +288,22 @@ Transporte-agnóstico: `handle(text, name) -> (replies: list[str], done: bool)`.
   "criar identidade". Pular: "pular", "depois", "agora não", "skip".
 - `needs_onboarding(name) -> bool` = ausência de `.onboarded`.
 
-> Observação: no fluxo de produção (Claude Code + Telegram), o onboarding pode ser
-> conduzido pela própria IA usando as libs; `onboarding.py` fornece o roteiro
-> canônico e é usado tal-e-qual em integrações que queiram um fluxo determinístico.
+> Observação: `onboarding.py` é o roteiro canônico transporte-agnóstico. **No fluxo
+> de produção (Claude Code + Telegram) o onboarding é HOOK-DRIVEN** — ver §6.1.
+
+### 6.1 Onboarding em produção (hook-driven)
+Quem dispara o onboarding no bot real é o `on_prompt.py`, não o `onboarding.py`:
+- A cada mensagem, se o cérebro da pessoa **não tem `.onboarded`**, o hook injeta
+  um bloco `[ONBOARDING PENDENTE]` instruindo a IA a conduzir um onboarding leve:
+  apresentar-se, dizer que tem memória persistente, perguntar como quer ser chamada
+  / que persona/vibe/emoji o bot deve ter / o que ela faz, e **adaptar a identidade**.
+- Quando a pessoa define a persona, a IA **persiste**: escreve `IDENTITY.md` no
+  cérebro dela e cria o marcador `.onboarded` → o bloco para de aparecer.
+- Se ela **adiar**, o `.onboarded` não é criado → o hook volta a lembrar nas próximas
+  conversas (sem insistir). É assim que o bot "lembra que falta formar a identidade".
+- Para a IA conseguir persistir mesmo servindo um **não-admin**, o `guard.py` libera
+  escrita/leitura na **própria memória** da pessoa (`data/users/<key>/`), além do
+  workspace — nunca na de outros nem na VPS.
 
 ---
 
@@ -422,14 +444,23 @@ python3 /root/user-brain-kit/groups_admin.py forget <projeto|group_id>
 Remove memória (`data/users/<projeto>-grupo`), workspace (`workspaces/<projeto>`)
 e as entradas em `access.json` e `identities.json`.
 
-**Pré-requisitos do Telegram (importantes):**
+**Pré-requisitos do Telegram (aprendidos na prática — importantes):**
 1. O **ID do grupo é obrigatório uma vez** (Telegram identifica grupo por número
    negativo, não por nome). Depois disso, tudo é por **nome do projeto**.
-2. **Modo privacidade do bot:** por padrão o bot em grupo **só recebe mensagens
-   que o mencionam** (`@<bot>`), comandos, ou respostas a ele. Verifique via
-   `getMe` (`can_read_all_group_messages`). Para responder a qualquer mensagem,
-   desligue o privacy mode no BotFather; senão, **mencione o bot**.
-3. `requireMention` no `access.json` deve ser coerente com o item 2.
+2. **Modo privacidade do bot** (a maior pegadinha): com privacidade **ligada**
+   (padrão), um bot **membro comum** em grupo só recebe **comandos** (`/x`),
+   `@menções` e respostas a ele — mensagem normal **nem chega**. Duas saídas:
+   - **Desligar** o privacy mode no **BotFather** (`/mybots` → bot → Bot Settings →
+     Group Privacy → **Turn off**) e depois **remover e re-adicionar** o bot ao
+     grupo. Aí ele lê tudo como membro comum, sem `@`. (Verifique com `getMe` →
+     `can_read_all_group_messages: true`.)
+   - Ou tornar o bot **administrador** do grupo (admin recebe tudo).
+3. **Migração grupo → supergrupo muda o ID!** Promover o bot a admin (ou outras
+   ações) converte um grupo básico em supergrupo e o `chat_id` **troca** (ex.:
+   `-5513505815` → `-1004347349967`). Se as mensagens pararem de chegar, cheque
+   `getChat`/`getChatMember` — se vier `migrate_to_chat_id`, **re-registre** com o
+   ID novo (`groups_admin.py forget <projeto>` + `register <id_novo> <projeto>`).
+4. `requireMention` no `access.json` deve ser coerente com o item 2.
 
 **Comportamento:**
 - Papel é do **remetente**: o admin continua admin no grupo; os demais ficam
