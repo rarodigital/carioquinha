@@ -59,6 +59,17 @@ ub.remember("Rafael", "Pediu deploy do bot.", kind="daily")       # persistente
 ub.set_profile_field("Rafael", "interesses", "café, edição de vídeo")
 ```
 
+### Captura contínua (o perfil aprofunda sozinho)
+
+Passe **toda mensagem normal** por `observe()`. Quando a pessoa se revela
+("me chama de X", "trabalho com Y", "gosto de Z"), o perfil é atualizado
+sozinho — reativo, sem comando manual e sem adivinhar:
+
+```python
+mudou = ub.observe("Rafael", texto_do_usuario)   # ex.: ["trabalho = marketing digital"]
+# 'mudou' é [] quando não há auto-revelação; o bot pode confirmar em 1 linha se quiser.
+```
+
 ## Scripts
 
 | Comando | O que faz |

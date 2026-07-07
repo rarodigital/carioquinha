@@ -57,6 +57,16 @@ if __name__ == "__main__":
     ub.remember("Rafael", "Pediu pra priorizar o repo user-brain-kit hoje.", kind="daily")
     ub.remember("Marina", "Prefere ser lembrada de beber água.", kind="fact")
 
+    # captura contínua: mensagens normais que revelam algo novo sobre a pessoa
+    print(f"\n{'-'*66}\n📥 CAPTURA CONTÍNUA (mensagens normais, sem comando)\n{'-'*66}")
+    for msg in [
+        "aliás gosto de fotografia também",
+        "agora trabalho com marketing digital",
+        "moro em Fortaleza",
+    ]:
+        mudou = ub.observe("Rafael", msg)
+        print(f"👤 {msg}\n   → capturado: {mudou or 'nada'}")
+
     mostrar_contexto("Rafael")
     mostrar_contexto("Marina")
 

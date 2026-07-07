@@ -163,6 +163,74 @@ def set_profile_field(name: str, key: str, value: str) -> None:
     p.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def append_profile_field(name: str, key: str, value: str) -> bool:
+    """Acrescenta um item a um campo (ex.: interesses) sem duplicar.
+
+    Retorna True se algo mudou. Para campos vazios, equivale a set.
+    """
+    atual = get_profile(name).get(key, "").strip()
+    value = value.strip()
+    if not value:
+        return False
+    itens = [x.strip() for x in re.split(r"[;,]", atual) if x.strip()]
+    if any(value.lower() == it.lower() for it in itens):
+        return False
+    itens.append(value)
+    set_profile_field(name, key, ", ".join(itens))
+    return True
+
+
+# ------------------------------------------------------------------ captura contínua
+# Padrões de auto-revelação em linguagem natural. Conservador de propósito:
+# só captura quando a pessoa afirma algo sobre si — não adivinha.
+_CAPTURE_PATTERNS = [
+    ("chamar",  "set",    [r"\bme chama de ([A-Za-zÀ-ÿ0-9 ._-]{2,30})",
+                            r"\bpode me chamar de ([A-Za-zÀ-ÿ0-9 ._-]{2,30})",
+                            r"\bmeu nome (?:é|e) ([A-Za-zÀ-ÿ0-9 ._-]{2,30})"]),
+    ("trabalho", "set",   [r"\b(?:eu )?trabalho com ([^.,;\n]{2,60})",
+                            r"\b(?:eu )?sou ([A-Za-zÀ-ÿ]+(?:ist[ao]|eir[ao]|or|óloga|ólogo|dor|dora))\b"]),
+    ("interesses", "append", [r"\b(?:eu )?(?:gosto de|curto|amo|adoro) ([^.,;\n]{2,50})"]),
+    ("estilo", "set",     [r"\b(?:prefiro|quero|responde|responda|me responde)(?: respostas?| que voc[eê] seja)? ([^.,;\n]{2,50})"]),
+    ("fuso", "set",       [r"\b(?:moro|estou|to|tô) em ([A-Za-zÀ-ÿ ]{2,40})"]),
+]
+
+
+def observe(name: str, text: str) -> list[str]:
+    """Lê uma mensagem normal e atualiza o perfil quando a pessoa se revela.
+
+    É o espírito do `/sync-pessoal`: o perfil aprofunda sozinho ao longo da
+    conversa, sem comando manual. Retorna a lista de mudanças aplicadas (pra
+    o bot poder confirmar em 1 linha, se quiser). Não faz nada se não achar
+    auto-revelação — reativo, não invasivo.
+    """
+    text = (text or "").strip()
+    if not text:
+        return []
+    ensure_user(name)
+    mudou: list[str] = []
+    for key, mode, pats in _CAPTURE_PATTERNS:
+        for pat in pats:
+            m = re.search(pat, text, flags=re.IGNORECASE)
+            if not m:
+                continue
+            val = m.group(1).strip().rstrip(".!,")
+            # tira filler comum no fim ("... também", "... agora", "... tbm")
+            val = re.sub(r"\s+(também|tambem|tbm|tb|agora|tá|ta|né|ne)$", "", val, flags=re.IGNORECASE).strip()
+            if not val:
+                continue
+            if mode == "append":
+                if append_profile_field(name, key, val):
+                    mudou.append(f"{key} += {val}")
+            else:
+                if get_profile(name).get(key, "").strip().lower() != val.lower():
+                    set_profile_field(name, key, val)
+                    mudou.append(f"{key} = {val}")
+            break  # um match por campo já basta nesta mensagem
+    if mudou:
+        remember(name, "Perfil atualizado (captura): " + "; ".join(mudou), kind="fact")
+    return mudou
+
+
 # ------------------------------------------------------------------ memória
 def remember(name: str, note: str, kind: str = "daily") -> Path:
     """Grava memória PERSISTENTE.
