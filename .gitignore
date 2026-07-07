@@ -7,3 +7,6 @@ data/
 
 # IDs reais de identidade (PII) — não versionar
 identities.json
+
+# Workspaces de runtime dos usuários (arquivos deles) — não versionar
+workspaces/

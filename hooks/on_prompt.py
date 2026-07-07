@@ -28,11 +28,12 @@ def main() -> None:
     except Exception:
         data = {}
     prompt = data.get("prompt") or data.get("user_prompt") or data.get("message") or ""
+    session_id = data.get("session_id", "")
 
     channel, raw = cq.parse_prompt(prompt)
     info = cq.resolve(channel, raw)
     try:
-        cq.set_active(info)
+        cq.set_active(info, session_id)
     except Exception:
         pass
 
@@ -49,10 +50,19 @@ def main() -> None:
     nota = (f"[carioquinha] Falando com voce agora: **{info['person']}** "
             f"via {channel} (papel={info['role']}, memoria={key}).")
     if info["role"] != "admin":
-        nota += ("\nESTE USUARIO E NAO-ADMIN: pode conversar, usar a propria memoria e "
-                 "ferramentas criativas. Acoes de shell, edicao de arquivos, git/GitHub, "
-                 "deploy e qualquer mudanca na VPS/estrutura estao BLOQUEADAS por hook. "
-                 "Nao tente executa-las; se ele pedir, explique gentilmente que so o admin faz isso.")
+        try:
+            ws = cq.workspace_dir(info["person"])
+        except Exception:
+            ws = "(workspace)"
+        nota += (
+            f"\nESTE USUARIO E NAO-ADMIN. Workspace dele: {ws}"
+            "\n- PODE: conversar, memoria propria, e editar/criar arquivos DENTRO do workspace "
+            "(HTML, textos, arquivos que ele enviou). Salve tudo dentro dessa pasta e devolva pra ele."
+            "\n- NAO PODE: editar fora do workspace, mexer na VPS/estrutura/sistema/nserver ou em "
+            "arquivos de outros usuarios; e (por ora) nao pode rodar shell (Bash). "
+            "Ferramentas que precisam de shell (editar foto, integracoes) ainda dependem do sandbox. "
+            "Se ele pedir algo bloqueado, explique gentilmente."
+        )
     else:
         nota += "\nAdmin: acesso total."
 

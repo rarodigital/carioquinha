@@ -18,6 +18,7 @@ Papéis:
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -25,7 +26,25 @@ import userbrain as ub
 
 ROOT = Path(__file__).resolve().parent
 IDENTITIES = ROOT / "identities.json"
-STATE = ub.DATA_ROOT / ".active-requester.json"
+
+# Workspace de cada pessoa: área onde o NÃO-ADMIN tem liberdade total (editar
+# arquivos que enviou, HTML, imagens, etc.). Fora daqui = VPS/estrutura = só admin.
+WORKSPACES_ROOT = Path(os.environ.get("CARIOQUINHA_WORKSPACES", ROOT / "workspaces")).expanduser()
+
+
+def _sid(session_id: str) -> str:
+    return (re.sub(r"[^A-Za-z0-9_-]+", "", session_id or "")[:64]) or "default"
+
+
+def state_path(session_id: str = "") -> Path:
+    """Estado do requester POR SESSÃO — evita conflito entre terminal e Telegram."""
+    return ub.DATA_ROOT / f".active-{_sid(session_id)}.json"
+
+
+def workspace_dir(person: str) -> Path:
+    d = WORKSPACES_ROOT / ub.user_slug(person)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 _CHANNEL_TAG = re.compile(r"<channel\b[^>]*>", re.IGNORECASE)
 _ATTR = lambda name, tag: (re.search(rf'{name}="([^"]*)"', tag) or [None, ""])[1] \
@@ -75,15 +94,16 @@ def resolve(channel: str, raw_user: str) -> dict:
             "role": role, "key": f"{person}-{channel}"}
 
 
-def set_active(info: dict) -> None:
-    STATE.parent.mkdir(parents=True, exist_ok=True)
-    STATE.write_text(json.dumps(info, ensure_ascii=False), encoding="utf-8")
+def set_active(info: dict, session_id: str = "") -> None:
+    p = state_path(session_id)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(info, ensure_ascii=False), encoding="utf-8")
 
 
-def get_active() -> dict:
-    """Estado do requester atual. Default = terminal/admin (a máquina é do Adalto)."""
+def get_active(session_id: str = "") -> dict:
+    """Estado do requester desta sessão. Default = terminal/admin (máquina do Adalto)."""
     try:
-        return json.loads(STATE.read_text(encoding="utf-8"))
+        return json.loads(state_path(session_id).read_text(encoding="utf-8"))
     except Exception:
         return {"channel": "terminal", "raw": "", "person": "adalto",
                 "role": "admin", "key": "adalto-terminal"}
