@@ -78,6 +78,35 @@ def strip_tags(text: str) -> str:
     return _CHANNEL_TAG.sub("", text or "").strip()
 
 
+def parse_attachments(prompt: str) -> list[str]:
+    """Caminhos locais de anexos citados na tag <channel> (foto/arquivo enviado)."""
+    m = _CHANNEL_TAG.search(prompt or "")
+    if not m:
+        return []
+    tag = m.group(0)
+    achados = []
+    for attr in ("image_path", "attachment_path", "document_path", "file_path"):
+        v = _ATTR(attr, tag)
+        if v:
+            achados.append(v)
+    return [p for p in achados if Path(p).is_file()]
+
+
+def stage_files(paths: list[str], person: str) -> list[str]:
+    """Copia anexos para o workspace da pessoa (staging). Devolve os nomes copiados."""
+    import shutil
+    ws = workspace_dir(person)
+    staged = []
+    for p in paths:
+        try:
+            dest = ws / Path(p).name
+            shutil.copy2(p, dest)
+            staged.append(dest.name)
+        except Exception:
+            pass
+    return staged
+
+
 def resolve(channel: str, raw_user: str) -> dict:
     ident = load_identities()
     channel = (channel or "terminal").lower()

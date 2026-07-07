@@ -54,6 +54,15 @@ def main() -> None:
             ws = cq.workspace_dir(info["person"])
         except Exception:
             ws = "(workspace)"
+        # STAGING: copia anexos enviados (foto/arquivo) para dentro do workspace,
+        # senao a jaula/leitura escopada nao enxerga (o inbox fica fora).
+        staged = []
+        try:
+            staged = cq.stage_files(cq.parse_attachments(prompt), info["person"])
+        except Exception:
+            staged = []
+        if staged:
+            nota += f"\nARQUIVOS RECEBIDOS copiados para o workspace: {', '.join(staged)} (use-os de {ws})."
         nota += (
             f"\nESTE USUARIO E NAO-ADMIN. Workspace dele: {ws}"
             "\n- PODE: conversar, memoria propria, e editar/criar arquivos DENTRO do workspace "

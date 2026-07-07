@@ -24,6 +24,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 FILE_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
+READ_TOOLS = {"Read", "Glob", "Grep"}
+PATH_SCOPED = FILE_TOOLS | READ_TOOLS
 SHELL_TOOLS = {"Bash"}
 
 
@@ -74,7 +76,8 @@ def main() -> None:
     person = active.get("person", "desconhecido")
 
     # ---- NÃO-ADMIN ----
-    if tool in FILE_TOOLS:
+    if tool in PATH_SCOPED:
+        acao = "ler" if tool in READ_TOOLS else "editar"
         try:
             import carioquinha as cq
             ws = cq.workspace_dir(person).resolve()
@@ -82,7 +85,7 @@ def main() -> None:
             _deny(f"Nao consegui resolver o workspace de '{person}'. Acao '{tool}' bloqueada por seguranca.")
         alvos = _target_paths(tool_input)
         if not alvos:
-            _deny(f"Acao '{tool}' sem caminho claro; bloqueada para nao-admin '{person}'.")
+            _deny(f"Acao '{tool}' sem caminho claro; bloqueada para nao-admin '{person}' (so dentro do workspace).")
         for p in alvos:
             try:
                 dest = Path(p).resolve()
@@ -90,9 +93,9 @@ def main() -> None:
                 _deny(f"Caminho invalido '{p}'. Bloqueado.")
             if ws != dest and ws not in dest.parents:
                 _deny(
-                    f"Usuario '{person}' (nao-admin) so pode editar dentro do proprio workspace "
-                    f"({ws}). O caminho '{dest}' esta FORA (VPS/estrutura) e foi bloqueado. "
-                    f"Escreva o arquivo dentro do workspace da pessoa e responda a ela."
+                    f"Usuario '{person}' (nao-admin) so pode {acao} dentro do proprio workspace "
+                    f"({ws}). O caminho '{dest}' esta FORA (VPS/estrutura/outros usuarios) e foi bloqueado. "
+                    f"Trabalhe dentro do workspace da pessoa e responda a ela."
                 )
         _allow()  # todos os alvos dentro do workspace
 
