@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+
+# Dados de runtime dos usuários (perfis/memória) — não versionar.
+# Regeneráveis: seed_registered.py recria os cadastrados; demo.py recria os de teste.
+data/
