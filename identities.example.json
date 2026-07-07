@@ -1,0 +1,9 @@
+{
+  "_comment": "Copie para identities.json e preencha com IDs reais (fica fora do Git).",
+  "terminal_person": "admin",
+  "admins": ["<telegram_id_do_admin>"],
+  "people": {
+    "<telegram_id_do_admin>": "admin",
+    "<outro_telegram_id>": "pessoa"
+  }
+}

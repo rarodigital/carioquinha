@@ -92,7 +92,48 @@ if not done:
 system_prompt = userbrain.context(nome_usuario)
 ```
 
+## Multiusuário no Claude Code (Telegram + terminal)
+
+Camada que liga o carioquinha ao Claude Code para atender **várias pessoas** com
+memória separada e **permissões por papel**, sem confiar só em instrução.
+
+| Peça | Arquivo | Função |
+|---|---|---|
+| Identidades | `identities.json` (real, fora do Git) / `identities.example.json` | mapeia `telegram_id → pessoa` e quem é **admin** |
+| Resolvedor | `carioquinha.py` | descobre pessoa/canal/papel e a chave de memória `<pessoa>-<canal>` |
+| Hook de entrada | `hooks/on_prompt.py` (UserPromptSubmit) | carrega a memória da pessoa, injeta no contexto e captura fatos novos |
+| Guardrail | `hooks/guard.py` (PreToolUse) | **bloqueia** shell/edição/git/VPS para não-admin |
+
+**Memória por pessoa + canal:** `adalto-telegram`, `rafaela-telegram`,
+`adalto-terminal`… ficam separados por padrão (mesmo repositório `data/`), então
+Telegram ≠ Web ≠ terminal. Dá pra "linkar" depois se quiserem compartilhar.
+
+**Papéis:**
+- **admin** (Adalto: terminal + Telegram) → acesso total, inclusive VPS/estrutura.
+- **normal** (demais) → chat + memória própria + criativo. Shell, edição de
+  arquivo, git/GitHub, deploy e mudanças na VPS são **bloqueados por hook**.
+
+### Instalação dos hooks (no `~/.claude/settings.json`)
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "python3 /root/user-brain-kit/hooks/on_prompt.py", "timeout": 15 } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Bash|Edit|Write|NotebookEdit|MultiEdit",
+        "hooks": [ { "type": "command", "command": "python3 /root/user-brain-kit/hooks/guard.py", "timeout": 10 } ] }
+    ]
+  }
+}
+```
+
+> Copie `identities.example.json` para `identities.json` e preencha os IDs reais.
+
 ## Não faz (por enquanto)
 
 - Multi-brain (pessoal/empresa/diretoria) e config OpenClaw — ficam para depois.
 - Não toca no nserver: `seed_registered.py` só **lê** os diretórios de usuário.
+- A **Web** hoje é o site do nserver (outro sistema, OpenRouter). Integrá-la ao
+  carioquinha exigiria mexer no nserver — deixado para depois.
