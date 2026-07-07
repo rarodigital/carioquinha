@@ -97,12 +97,29 @@ def main() -> None:
         _allow()  # todos os alvos dentro do workspace
 
     if tool in SHELL_TOOLS:
-        _deny(
-            f"Usuario '{person}' (nao-admin) ainda nao pode rodar shell (Bash). "
-            f"Edicoes de arquivo no workspace dele funcionam normalmente. "
-            f"Ferramentas que precisam de shell (foto/integracoes) dependem do sandbox "
-            f"de SO, que ainda nao esta ativo. Responda sem executar shell."
-        )
+        # Bash de nao-admin: NAO nega — embrulha na jaula (bwrap) confinada ao
+        # workspace e libera. Ela roda ferramentas/integracoes sem alcancar a VPS.
+        cmd = tool_input.get("command", "")
+        if not cmd:
+            _allow()
+        try:
+            import carioquinha as cq
+            import sandbox
+            ws = cq.workspace_dir(person)
+            wrapped = sandbox.wrap_command(cmd, ws)
+        except Exception as e:
+            _deny(f"Nao consegui confinar o shell de '{person}' com seguranca ({e}). Acao bloqueada.")
+        novo = dict(tool_input)
+        novo["command"] = wrapped
+        print(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": f"Shell de '{person}' confinado ao workspace (sandbox).",
+                "updatedInput": novo,
+            }
+        }, ensure_ascii=False))
+        sys.exit(0)
 
     _allow()  # ferramentas neutras (Read, etc.) liberadas
 
