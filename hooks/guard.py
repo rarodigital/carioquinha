@@ -80,24 +80,27 @@ def main() -> None:
         acao = "ler" if tool in READ_TOOLS else "editar"
         try:
             import carioquinha as cq
+            import userbrain as ub
             ws = cq.workspace_dir(person).resolve()
+            brain = ub.user_dir(active.get("key", "")).resolve()  # memória PRÓPRIA da pessoa
         except Exception:
             _deny(f"Nao consegui resolver o workspace de '{person}'. Acao '{tool}' bloqueada por seguranca.")
+        roots = [ws, brain]  # pode mexer no proprio workspace e na propria memoria; nada alem
         alvos = _target_paths(tool_input)
         if not alvos:
-            _deny(f"Acao '{tool}' sem caminho claro; bloqueada para nao-admin '{person}' (so dentro do workspace).")
+            _deny(f"Acao '{tool}' sem caminho claro; bloqueada para nao-admin '{person}' (so dentro do workspace/memoria dele).")
         for p in alvos:
             try:
                 dest = Path(p).resolve()
             except Exception:
                 _deny(f"Caminho invalido '{p}'. Bloqueado.")
-            if ws != dest and ws not in dest.parents:
+            if not any(r == dest or r in dest.parents for r in roots):
                 _deny(
-                    f"Usuario '{person}' (nao-admin) so pode {acao} dentro do proprio workspace "
-                    f"({ws}). O caminho '{dest}' esta FORA (VPS/estrutura/outros usuarios) e foi bloqueado. "
-                    f"Trabalhe dentro do workspace da pessoa e responda a ela."
+                    f"Usuario '{person}' (nao-admin) so pode {acao} no proprio workspace ({ws}) ou "
+                    f"na propria memoria ({brain}). O caminho '{dest}' esta FORA (VPS/estrutura/outros "
+                    f"usuarios) e foi bloqueado. Trabalhe dentro do espaco da pessoa e responda a ela."
                 )
-        _allow()  # todos os alvos dentro do workspace
+        _allow()  # todos os alvos dentro do workspace/memória da própria pessoa
 
     if tool in SHELL_TOOLS:
         # Bash de nao-admin: NAO nega — embrulha na jaula (bwrap) confinada ao

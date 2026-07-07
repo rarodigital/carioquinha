@@ -126,25 +126,38 @@ def resolve(channel: str, raw_user: str) -> dict:
 
 
 def parse_channel(prompt: str) -> dict:
-    """Extrai canal + chat_id + user (username) da tag <channel>. Sem tag = terminal."""
+    """Extrai canal + chat_id + user + user_id da tag <channel>. Sem tag = terminal.
+
+    O harness usa source como 'plugin:telegram:telegram' — normalizamos para
+    'telegram'. A tag traz `user_id` (id numérico do REMETENTE), usado para papel.
+    """
     m = _CHANNEL_TAG.search(prompt or "")
     if not m:
-        return {"channel": "terminal", "chat_id": "", "user": ""}
+        return {"channel": "terminal", "chat_id": "", "user": "", "user_id": ""}
     tag = m.group(0)
+    source = (_ATTR("source", tag) or "terminal").lower()
+    if "telegram" in source:
+        source = "telegram"
+    elif "web" in source:
+        source = "web"
     return {
-        "channel": (_ATTR("source", tag) or "terminal").lower(),
+        "channel": source,
         "chat_id": (_ATTR("chat_id", tag) or "").strip(),
         "user": (_ATTR("user", tag) or "").strip(),
+        "user_id": (_ATTR("user_id", tag) or "").strip(),
     }
 
 
-def _is_admin(ident: dict, chat_id: str, user: str) -> bool:
-    """Admin pelo REMETENTE: username (grupos) ou chat_id numérico (DM)."""
+def _is_admin(ident: dict, chat_id: str, user: str, user_id: str = "") -> bool:
+    """Admin pelo REMETENTE. Preferir user_id (id numérico, confiável); depois
+    chat_id (DM) e por fim username (fallback)."""
     admins = [str(a) for a in ident.get("admins", [])]
-    admin_users = [u.lower() for u in ident.get("admin_usernames", [])]
-    if user and user.lower() in admin_users:
+    if user_id and user_id in admins:
         return True
     if chat_id and chat_id in admins:
+        return True
+    admin_users = [u.lower() for u in ident.get("admin_usernames", [])]
+    if user and user.lower() in admin_users:
         return True
     return False
 
@@ -160,32 +173,34 @@ def resolve_prompt(prompt: str) -> dict:
     """
     ident = load_identities()
     c = parse_channel(prompt)
-    ch, chat_id, user = c["channel"], c["chat_id"], c["user"]
+    ch, chat_id, user, user_id = c["channel"], c["chat_id"], c["user"], c["user_id"]
 
     if ch == "terminal":
         person = ident.get("terminal_person", "admin")
-        return {"channel": "terminal", "chat_id": "", "user": "", "person": person,
+        return {"channel": "terminal", "chat_id": "", "user": "", "user_id": "", "person": person,
                 "role": "admin", "key": f"{person}-terminal", "scope": "terminal", "is_group": False}
 
     if ch == "telegram":
         is_group = chat_id.startswith("-")
-        role = "admin" if _is_admin(ident, chat_id, user) else "normal"
+        role = "admin" if _is_admin(ident, chat_id, user, user_id) else "normal"
         if is_group:
             g = ident.get("groups", {}).get(chat_id, {})
             project = g.get("project") or f"grupo-{chat_id.lstrip('-')}"
-            return {"channel": "telegram", "chat_id": chat_id, "user": user, "person": project,
-                    "role": role, "key": f"{project}-grupo", "scope": "group",
+            return {"channel": "telegram", "chat_id": chat_id, "user": user, "user_id": user_id,
+                    "person": project, "role": role, "key": f"{project}-grupo", "scope": "group",
                     "is_group": True, "project": project}
-        person = (ident.get("people", {}).get(chat_id)
+        person = (ident.get("people", {}).get(user_id)
+                  or ident.get("people", {}).get(chat_id)
                   or ident.get("usernames", {}).get(user)
-                  or f"tg-{chat_id or 'anon'}")
-        return {"channel": "telegram", "chat_id": chat_id, "user": user, "person": person,
-                "role": role, "key": f"{person}-telegram", "scope": "dm", "is_group": False}
+                  or f"tg-{user_id or chat_id or 'anon'}")
+        return {"channel": "telegram", "chat_id": chat_id, "user": user, "user_id": user_id,
+                "person": person, "role": role, "key": f"{person}-telegram", "scope": "dm", "is_group": False}
 
     # outros canais (ex.: web): por usuário
-    person = ident.get("people", {}).get(user) or ident.get("usernames", {}).get(user) or f"{ch[:2]}-{user or 'anon'}"
-    role = "admin" if _is_admin(ident, "", user) else "normal"
-    return {"channel": ch, "chat_id": chat_id, "user": user, "person": person,
+    person = (ident.get("people", {}).get(user_id) or ident.get("people", {}).get(user)
+              or ident.get("usernames", {}).get(user) or f"{ch[:2]}-{user or user_id or 'anon'}")
+    role = "admin" if _is_admin(ident, "", user, user_id) else "normal"
+    return {"channel": ch, "chat_id": chat_id, "user": user, "user_id": user_id, "person": person,
             "role": role, "key": f"{person}-{ch}", "scope": ch, "is_group": False}
 
 

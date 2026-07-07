@@ -90,6 +90,29 @@ def main() -> None:
                  "ESQUECER/apagar um projeto -> `python3 /root/user-brain-kit/groups_admin.py forget <projeto>`. "
                  "Ex.: se o admin disser 'libera o grupo -123 como projeto site', rode o register.")
 
+    # ONBOARDING: se a pessoa ainda nao formou a identidade do bot (sem .onboarded),
+    # instrui o agente a conduzir um onboarding leve. Se ela adiar, o marcador
+    # continua ausente e o lembrete volta nas proximas conversas (sem insistir).
+    if info.get("scope") != "group":  # onboarding e por PESSOA, nao por grupo-projeto
+        try:
+            brain = ub.user_dir(key)
+            onboarded = (brain / ".onboarded").exists()
+        except Exception:
+            brain, onboarded = None, True
+        if not onboarded and brain is not None:
+            nota += (
+                "\n\n[ONBOARDING PENDENTE] Esta pessoa ainda nao concluiu o onboarding "
+                f"(nao existe {brain}/.onboarded). Conduza um onboarding leve e acolhedor NESTA conversa, "
+                "sem robotizar: (1) apresente-se em 1-2 linhas e diga que voce tem MEMORIA PERSISTENTE "
+                "(vai lembrar dela); (2) pergunte como ela quer te chamar, que personalidade/vibe quer que "
+                "voce tenha (direto, caloroso, tecnico, brincalhao...) e uso de emoji; (3) pergunte um pouco "
+                "sobre ela (o que faz, o que costuma pedir). ADAPTE sua identidade ao que ela pedir. "
+                f"Quando ela definir sua persona e como te chamar, PERSISTA: escreva {brain}/IDENTITY.md com "
+                f"a persona escolhida e crie o arquivo {brain}/.onboarded (1 linha com a data) para concluir. "
+                "Se ela NAO quiser agora, tudo bem: ajude no que pedir e NAO crie o .onboarded — voce lembrara "
+                "de terminar de formar sua identidade nas proximas conversas. Toque no assunto de leve, sem insistir."
+            )
+
     out = {
         "hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
