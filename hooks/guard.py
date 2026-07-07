@@ -9,10 +9,10 @@ Modelo:
                      fora dele (VPS/estrutura/sistema/outros usuários).
 
 Regras para NÃO-ADMIN:
-  - Edit/Write/NotebookEdit/MultiEdit: permitido SE o arquivo estiver dentro do
-    workspace da pessoa; senão negado.
-  - Bash: negado por enquanto (confinamento seguro de shell exige sandbox de SO;
-    ver README / decisão pendente).
+  - Read/Glob/Grep e Edit/Write/NotebookEdit/MultiEdit: permitido SE o caminho
+    estiver dentro do workspace da pessoa; senão negado.
+  - Bash: NÃO é negado — o comando é embrulhado numa jaula bubblewrap (sandbox.py)
+    confinada ao workspace e liberado via `updatedInput`.
 
 O requester atual vem do estado por-sessão gravado pelo on_prompt.py.
 Falha segura para o TERMINAL: sem estado -> assume admin (a máquina é do Adalto).

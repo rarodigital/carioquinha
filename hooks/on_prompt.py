@@ -65,12 +65,14 @@ def main() -> None:
             nota += f"\nARQUIVOS RECEBIDOS copiados para o workspace: {', '.join(staged)} (use-os de {ws})."
         nota += (
             f"\nESTE USUARIO E NAO-ADMIN. Workspace dele: {ws}"
-            "\n- PODE: conversar, memoria propria, e editar/criar arquivos DENTRO do workspace "
-            "(HTML, textos, arquivos que ele enviou). Salve tudo dentro dessa pasta e devolva pra ele."
-            "\n- NAO PODE: editar fora do workspace, mexer na VPS/estrutura/sistema/nserver ou em "
-            "arquivos de outros usuarios; e (por ora) nao pode rodar shell (Bash). "
-            "Ferramentas que precisam de shell (editar foto, integracoes) ainda dependem do sandbox. "
-            "Se ele pedir algo bloqueado, explique gentilmente."
+            "\n- PODE: conversar; memoria propria; ler/editar/criar arquivos DENTRO do workspace "
+            "(HTML, textos, fotos, arquivos que ele enviou); e RODAR SHELL/FERRAMENTAS (Bash) — "
+            "o shell dele roda automaticamente confinado numa jaula (sandbox) presa ao workspace, "
+            "com rede liberada. Pode editar foto, rodar python, plugar integracoes etc. "
+            "Salve tudo dentro do workspace e devolva pra ele."
+            "\n- NAO PODE: ler/editar fora do workspace, mexer na VPS/estrutura/sistema/nserver ou "
+            "em arquivos de outros usuarios (bloqueado por hook). Se ele pedir algo fora, explique "
+            "gentilmente que so o admin faz isso; nao insista em caminhos fora do workspace."
         )
     else:
         nota += "\nAdmin: acesso total."
