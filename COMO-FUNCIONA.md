@@ -173,19 +173,36 @@ ou `[]`.
 {
   "terminal_person": "adalto",
   "admins": ["7403271687"],
-  "people": { "7403271687": "adalto", "207597739": "rafaela" }
+  "admin_usernames": ["nydollar"],
+  "people": { "7403271687": "adalto", "207597739": "rafaela" },
+  "usernames": { "nydollar": "adalto" },
+  "groups": { "-1001999888": { "project": "site-cliente", "topic": "landing page" } }
 }
 ```
 - `terminal_person`: nome da pessoa quando o canal é `terminal`.
-- `admins`: lista de IDs (string) com papel `admin`.
-- `people`: mapa `id_bruto -> nome da pessoa`.
+- `admins`: **chat_ids** (string) com papel admin — usado em **DM** (no DM o
+  chat_id == id do usuário).
+- `admin_usernames`: **usernames** Telegram do admin — usado em **GRUPO** (onde o
+  chat_id é do grupo, não da pessoa; o remetente é identificado pelo username).
+- `people`: mapa `chat_id -> pessoa`. `usernames`: mapa `username -> pessoa`.
+- `groups`: mapa `chat_id_do_grupo -> {project, topic}` (rótulo opcional do
+  projeto/pasta; sem entrada, usa `grupo-<id>`).
 
-### 4.3 Resolução — `resolve(channel, raw_user) -> dict`
-Retorna `{channel, raw, person, role, key}`.
-- `channel == "terminal"` → `person=terminal_person`, `role="admin"`, `key="<person>-terminal"`.
-- Caso contrário: `person = people[raw]` ou fallback `"<canal[:2]>-<raw|anon>"`
-  (ex.: `te-999888`); `role="admin"` se `raw ∈ admins`, senão `"normal"`;
-  `key="<person>-<channel>"`.
+### 4.3 Resolução — `resolve_prompt(prompt) -> dict` (usado pelos hooks)
+Retorna `{channel, chat_id, user, person, role, key, scope, is_group}`. Regras:
+
+| Contexto | Detecção | `person` (dono da memória/workspace) | `role` | `key` |
+|---|---|---|---|---|
+| **terminal** | sem tag `<channel>` | `terminal_person` | admin | `<person>-terminal` |
+| **Telegram DM** | `chat_id` positivo | pessoa do remetente (`people[chat_id]`/`usernames[user]`/`tg-<chat_id>`) | admin se remetente é admin | `<person>-telegram` |
+| **Telegram GRUPO** | `chat_id` começa com `-` | **projeto do grupo** (`groups[chat_id].project` ou `grupo-<id>`) — COMPARTILHADO | admin se **quem falou** é admin | `<project>-grupo` |
+| **web / outro** | `source` da tag | pessoa do `user` | admin se admin | `<person>-<canal>` |
+
+**Papel é sempre do REMETENTE** (`_is_admin`: username ∈ `admin_usernames`, ou
+chat_id ∈ `admins`). Assim, num grupo, o admin continua admin e os demais ficam
+`normal` — todos compartilhando a mesma memória/workspace do grupo (o projeto).
+
+> `resolve(channel, raw_user)` (versão simples) permanece para terminal/DM e testes.
 
 ### 4.4 Parsing do harness
 A mensagem do harness pode conter a tag `<channel …>`. Helpers:
@@ -381,8 +398,24 @@ ps -o pid,etimes,cmd -C claude | grep -- '--channels'
 > sessão de terminal (`claude` sem `--channels`).
 
 ### 9.2 Cadastrar/ajustar pessoas
-Editar `identities.json` (não versionado): adicionar `id -> nome` em `people` e o
-`id` em `admins` se for administrador. Efeito imediato (o resolvedor relê o arquivo).
+Editar `identities.json` (não versionado): adicionar `chat_id -> nome` em `people`
+e o `chat_id` em `admins` se for administrador (DM). Para admin em **grupos**,
+adicionar o **username** em `admin_usernames` e em `usernames`. Efeito imediato
+(o resolvedor relê o arquivo).
+
+### 9.3 Grupos (1 grupo = 1 projeto = 1 workspace + 1 memória)
+1. **Habilitar o acesso a grupos** no plugin do Telegram — isso é feito pelo
+   **administrador** via a skill `/telegram:access` (o carioquinha NÃO edita
+   `access.json`). Sem isso, o bot não responde em grupo.
+2. Colocar o bot no grupo. A partir daí, aquele grupo já tem **memória e workspace
+   próprios** (`grupo-<id>`), compartilhados por todos os membros.
+3. (Opcional) Dar um **nome de projeto/pasta** ao grupo: adicionar em
+   `identities.json` → `groups`: `"<chat_id_do_grupo>": {"project": "meu-projeto"}`.
+   Aí o workspace vira `workspaces/meu-projeto/` e a memória `meu-projeto-grupo`.
+4. **Papel no grupo é do remetente:** o admin continua admin (acesso total); os
+   demais membros ficam confinados ao workspace do grupo.
+5. "Neste grupo trate do assunto X" fica gravado na **memória do grupo** (é só
+   dizer uma vez).
 
 ---
 

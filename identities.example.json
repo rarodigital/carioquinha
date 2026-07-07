@@ -1,9 +1,15 @@
 {
-  "_comment": "Copie para identities.json e preencha com IDs reais (fica fora do Git).",
+  "_comment": "Copie para identities.json e preencha com valores reais (fica fora do Git).",
   "terminal_person": "admin",
-  "admins": ["<telegram_id_do_admin>"],
+  "admins": ["<telegram_chat_id_do_admin_no_DM>"],
+  "admin_usernames": ["<username_telegram_do_admin>"],
   "people": {
-    "<telegram_id_do_admin>": "admin",
-    "<outro_telegram_id>": "pessoa"
+    "<telegram_chat_id>": "pessoa"
+  },
+  "usernames": {
+    "<username_telegram>": "pessoa"
+  },
+  "groups": {
+    "<chat_id_do_grupo_negativo>": { "project": "nome-do-projeto", "topic": "assunto do grupo" }
   }
 }

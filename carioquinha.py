@@ -108,6 +108,8 @@ def stage_files(paths: list[str], person: str) -> list[str]:
 
 
 def resolve(channel: str, raw_user: str) -> dict:
+    """Resolução simples por (canal, id) — mantida para DM/terminal e testes.
+    Para o fluxo completo (com grupos), use resolve_prompt()."""
     ident = load_identities()
     channel = (channel or "terminal").lower()
     raw = str(raw_user or "").strip()
@@ -115,12 +117,76 @@ def resolve(channel: str, raw_user: str) -> dict:
     if channel == "terminal":
         person = ident.get("terminal_person", "admin")
         return {"channel": "terminal", "raw": raw, "person": person,
-                "role": "admin", "key": f"{person}-terminal"}
+                "role": "admin", "key": f"{person}-terminal", "scope": "terminal"}
 
     person = ident.get("people", {}).get(raw) or f"{channel[:2]}-{raw or 'anon'}"
     role = "admin" if raw in ident.get("admins", []) else "normal"
     return {"channel": channel, "raw": raw, "person": person,
-            "role": role, "key": f"{person}-{channel}"}
+            "role": role, "key": f"{person}-{channel}", "scope": "dm"}
+
+
+def parse_channel(prompt: str) -> dict:
+    """Extrai canal + chat_id + user (username) da tag <channel>. Sem tag = terminal."""
+    m = _CHANNEL_TAG.search(prompt or "")
+    if not m:
+        return {"channel": "terminal", "chat_id": "", "user": ""}
+    tag = m.group(0)
+    return {
+        "channel": (_ATTR("source", tag) or "terminal").lower(),
+        "chat_id": (_ATTR("chat_id", tag) or "").strip(),
+        "user": (_ATTR("user", tag) or "").strip(),
+    }
+
+
+def _is_admin(ident: dict, chat_id: str, user: str) -> bool:
+    """Admin pelo REMETENTE: username (grupos) ou chat_id numérico (DM)."""
+    admins = [str(a) for a in ident.get("admins", [])]
+    admin_users = [u.lower() for u in ident.get("admin_usernames", [])]
+    if user and user.lower() in admin_users:
+        return True
+    if chat_id and chat_id in admins:
+        return True
+    return False
+
+
+def resolve_prompt(prompt: str) -> dict:
+    """Resolvedor COMPLETO (usado pelos hooks). Entende:
+      - terminal: admin.
+      - Telegram DM (chat_id positivo): memória/workspace por PESSOA; papel pelo remetente.
+      - Telegram GRUPO (chat_id começa com '-'): memória/workspace por GRUPO/PROJETO
+        (compartilhado); papel pelo REMETENTE (você continua admin nos seus grupos).
+      - outros canais (web): por usuário.
+    Retorna {channel, chat_id, user, person, role, key, scope, is_group}.
+    """
+    ident = load_identities()
+    c = parse_channel(prompt)
+    ch, chat_id, user = c["channel"], c["chat_id"], c["user"]
+
+    if ch == "terminal":
+        person = ident.get("terminal_person", "admin")
+        return {"channel": "terminal", "chat_id": "", "user": "", "person": person,
+                "role": "admin", "key": f"{person}-terminal", "scope": "terminal", "is_group": False}
+
+    if ch == "telegram":
+        is_group = chat_id.startswith("-")
+        role = "admin" if _is_admin(ident, chat_id, user) else "normal"
+        if is_group:
+            g = ident.get("groups", {}).get(chat_id, {})
+            project = g.get("project") or f"grupo-{chat_id.lstrip('-')}"
+            return {"channel": "telegram", "chat_id": chat_id, "user": user, "person": project,
+                    "role": role, "key": f"{project}-grupo", "scope": "group",
+                    "is_group": True, "project": project}
+        person = (ident.get("people", {}).get(chat_id)
+                  or ident.get("usernames", {}).get(user)
+                  or f"tg-{chat_id or 'anon'}")
+        return {"channel": "telegram", "chat_id": chat_id, "user": user, "person": person,
+                "role": role, "key": f"{person}-telegram", "scope": "dm", "is_group": False}
+
+    # outros canais (ex.: web): por usuário
+    person = ident.get("people", {}).get(user) or ident.get("usernames", {}).get(user) or f"{ch[:2]}-{user or 'anon'}"
+    role = "admin" if _is_admin(ident, "", user) else "normal"
+    return {"channel": ch, "chat_id": chat_id, "user": user, "person": person,
+            "role": role, "key": f"{person}-{ch}", "scope": ch, "is_group": False}
 
 
 def set_active(info: dict, session_id: str = "") -> None:

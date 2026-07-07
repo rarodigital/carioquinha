@@ -30,8 +30,8 @@ def main() -> None:
     prompt = data.get("prompt") or data.get("user_prompt") or data.get("message") or ""
     session_id = data.get("session_id", "")
 
-    channel, raw = cq.parse_prompt(prompt)
-    info = cq.resolve(channel, raw)
+    info = cq.resolve_prompt(prompt)
+    channel = info["channel"]
     try:
         cq.set_active(info, session_id)
     except Exception:
@@ -47,8 +47,18 @@ def main() -> None:
     except Exception:
         contexto = ""
 
-    nota = (f"[carioquinha] Falando com voce agora: **{info['person']}** "
-            f"via {channel} (papel={info['role']}, memoria={key}).")
+    if info.get("scope") == "group":
+        try:
+            gws = cq.workspace_dir(info["person"])
+        except Exception:
+            gws = "(workspace)"
+        nota = (f"[carioquinha] GRUPO/PROJETO: **{info['person']}** (papel de quem falou={info['role']}, "
+                f"memoria compartilhada do grupo={key}). Trate deste projeto; mantenha TODOS os "
+                f"arquivos do projeto em {gws}. A memoria e compartilhada por todos do grupo — o que "
+                f"for definido aqui (assunto, decisoes) vale para o grupo.")
+    else:
+        nota = (f"[carioquinha] Falando com voce agora: **{info['person']}** "
+                f"via {channel} (papel={info['role']}, memoria={key}).")
     if info["role"] != "admin":
         try:
             ws = cq.workspace_dir(info["person"])
