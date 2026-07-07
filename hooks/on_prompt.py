@@ -85,7 +85,10 @@ def main() -> None:
             "gentilmente que so o admin faz isso; nao insista em caminhos fora do workspace."
         )
     else:
-        nota += "\nAdmin: acesso total."
+        nota += ("\nAdmin: acesso total. Para grupos-projeto (admin): "
+                 "REGISTRAR um grupo -> `python3 /root/user-brain-kit/groups_admin.py register <group_id> <projeto>`; "
+                 "ESQUECER/apagar um projeto -> `python3 /root/user-brain-kit/groups_admin.py forget <projeto>`. "
+                 "Ex.: se o admin disser 'libera o grupo -123 como projeto site', rode o register.")
 
     out = {
         "hookSpecificOutput": {

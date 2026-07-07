@@ -77,6 +77,7 @@ carioquinha/
 ├── carioquinha.py            # LIB: identidade/papel/canal, estado/sessão, anexos, workspaces
 ├── onboarding.py             # LIB: fluxo de onboarding (transporte-agnóstico)
 ├── sandbox.py                # LIB: jaula bubblewrap para shell de não-admin
+├── groups_admin.py           # SCRIPT: registrar/esquecer/listar grupos-projeto (admin)
 ├── seed_registered.py        # SCRIPT: cria USER.md para usuários já cadastrados no nserver
 ├── demo.py                   # SCRIPT: demonstração ponta a ponta
 ├── identities.example.json   # modelo do mapa de identidades
@@ -404,18 +405,41 @@ adicionar o **username** em `admin_usernames` e em `usernames`. Efeito imediato
 (o resolvedor relê o arquivo).
 
 ### 9.3 Grupos (1 grupo = 1 projeto = 1 workspace + 1 memória)
-1. **Habilitar o acesso a grupos** no plugin do Telegram — isso é feito pelo
-   **administrador** via a skill `/telegram:access` (o carioquinha NÃO edita
-   `access.json`). Sem isso, o bot não responde em grupo.
-2. Colocar o bot no grupo. A partir daí, aquele grupo já tem **memória e workspace
-   próprios** (`grupo-<id>`), compartilhados por todos os membros.
-3. (Opcional) Dar um **nome de projeto/pasta** ao grupo: adicionar em
-   `identities.json` → `groups`: `"<chat_id_do_grupo>": {"project": "meu-projeto"}`.
-   Aí o workspace vira `workspaces/meu-projeto/` e a memória `meu-projeto-grupo`.
-4. **Papel no grupo é do remetente:** o admin continua admin (acesso total); os
-   demais membros ficam confinados ao workspace do grupo.
-5. "Neste grupo trate do assunto X" fica gravado na **memória do grupo** (é só
-   dizer uma vez).
+
+**Registrar um grupo como projeto (comando único, admin):**
+```bash
+python3 /root/user-brain-kit/groups_admin.py register <group_id> <projeto> [--allow id1,id2] [--mention]
+```
+Isto faz as DUAS pontas de uma vez: libera o grupo no `access.json` (quais grupos
+o bot ouve) **e** rotula o grupo como projeto no `identities.json`. Uso
+conversacional: o admin diz no chat *"libera o grupo -123 como projeto site"* e a
+IA roda o `register` (o hint está injetado no contexto do admin pelo `on_prompt`).
+
+**Esquecer/apagar um projeto (admin):**
+```bash
+python3 /root/user-brain-kit/groups_admin.py forget <projeto|group_id>
+```
+Remove memória (`data/users/<projeto>-grupo`), workspace (`workspaces/<projeto>`)
+e as entradas em `access.json` e `identities.json`.
+
+**Pré-requisitos do Telegram (importantes):**
+1. O **ID do grupo é obrigatório uma vez** (Telegram identifica grupo por número
+   negativo, não por nome). Depois disso, tudo é por **nome do projeto**.
+2. **Modo privacidade do bot:** por padrão o bot em grupo **só recebe mensagens
+   que o mencionam** (`@<bot>`), comandos, ou respostas a ele. Verifique via
+   `getMe` (`can_read_all_group_messages`). Para responder a qualquer mensagem,
+   desligue o privacy mode no BotFather; senão, **mencione o bot**.
+3. `requireMention` no `access.json` deve ser coerente com o item 2.
+
+**Comportamento:**
+- Papel é do **remetente**: o admin continua admin no grupo; os demais ficam
+  confinados ao workspace do grupo (compartilhado).
+- "Neste grupo trate do assunto X" fica gravado na **memória do grupo** (dizer uma vez).
+
+> Segurança: `groups_admin.py` só roda de fato para o **admin** — o `guard.py`
+> confina o shell de não-admin numa jaula que não alcança `access.json`/`identities.json`.
+> O acesso `/telegram:access` (skill) continua sendo uma via manual alternativa,
+> restrita a comandos digitados no terminal.
 
 ---
 
